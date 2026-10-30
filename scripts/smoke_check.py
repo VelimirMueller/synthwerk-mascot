@@ -68,7 +68,10 @@ def main() -> int:
     code, body = get("/healthz")
     check(code == 200 and body == {"status": "ok"}, "/healthz 200 ok")
     code, body = get("/readyz")
-    check(code == 200 and body["status"] == "ok", f"/readyz 200 ok (commit {body['commit']})")
+    if code != 200 or not isinstance(body, dict):
+        check(False, f"/readyz answered {code} within 60 s: {body}")
+        return 1
+    check(body["status"] == "ok", f"/readyz 200 ok (commit {body['commit']})")
 
     for case in QUESTIONS["answered"]:
         code, body, _ = ask(case["question"])

@@ -46,6 +46,7 @@ def _start_loading(app: FastAPI, settings: Settings, loader: Loader) -> threadin
             logger.error(
                 "model or index failed to load",
                 extra={"event.name": "mascot.load.failed", "error.type": type(exc).__name__},
+                exc_info=exc,  # paths and file checks only; no request data exists yet
             )
             return
         app.state.embedder, app.state.index = embedder, index
