@@ -1,0 +1,122 @@
+# Fleet standard ci.yml (fleet-standard templates/deploys/public) for a Python service.
+# The build stage builds the image (model + index inside) and runs scripts/docker-smoke.sh: the
+# container starts with no network, then health, search quality, no egress and the rate limit
+# are checked inside it. The image is published only by deploy.yml.
+# Required check for the rulesets: "conclusion".
+# No push trigger (CI-COST-05): a change reaches main through a PR run of this workflow.
+name: ci
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      e2e:
+        description: Run the e2e stage
+        type: boolean
+        default: false
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.event.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' }}
+    steps:
+      # Only negated patterns, so predicate-quantifier must be `every`: a file is code when it
+      # matches every pattern (it is not docs); code=true when any changed file is code.
+      - name: Detect code changes
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        with:
+          predicate-quantifier: every
+          filters: |
+            code:
+              - '!**/*.md'
+              - '!docs/**'
+              - '!LICENSE'
+              - '!.github/ISSUE_TEMPLATE/**'
+
+  lint:
+    needs: changes
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    permissions:
+      contents: read
+    uses: VelimirMueller/fleet-workflows/.github/workflows/_ci-lint.yml@v0.0.4
+    with:
+      stack: python
+      # mypy reads its file list from pyproject.toml (src, tests, scripts).
+      command: ruff check . && ruff format --check . && mypy
+
+  unit:
+    needs: [changes, lint]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    permissions:
+      contents: read
+    uses: VelimirMueller/fleet-workflows/.github/workflows/_ci-unit.yml@v0.0.4
+    with:
+      # The fake model (a real ONNX graph) runs the whole path; tests/test_quality.py needs the
+      # real weights and is skipped here. The build stage runs those questions in the image.
+      stack: python
+
+  e2e:
+    needs: [changes, unit]
+    if: ${{ !failure() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.e2e }}
+    permissions:
+      contents: read
+    uses: VelimirMueller/fleet-workflows/.github/workflows/_ci-e2e.yml@v0.0.4
+    with:
+      stack: generic
+      # The container smoke is the end-to-end test: real model, real index, no network.
+      command: scripts/docker-smoke.sh
+
+  build:
+    needs: [changes, e2e]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    permissions:
+      contents: read
+    uses: VelimirMueller/fleet-workflows/.github/workflows/_ci-build.yml@v0.0.4
+    with:
+      stack: generic
+      command: scripts/docker-smoke.sh
+      image: true
+
+  conclusion:
+    needs: [changes, lint, unit, e2e, build]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Fail when a job failed or a required stage was skipped
+        env:
+          CODE: ${{ needs.changes.outputs.code }}
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+          LINT: ${{ needs.lint.result }}
+          UNIT: ${{ needs.unit.result }}
+          BUILD: ${{ needs.build.result }}
+        run: |
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "::error::a job ended as $r"; exit 1 ;; esac
+          done
+          if [ "$CODE" = "true" ]; then
+            for r in "$LINT" "$UNIT" "$BUILD"; do
+              [ "$r" = "success" ] || { echo "::error::a required stage did not run"; exit 1; }
+            done
+          fi

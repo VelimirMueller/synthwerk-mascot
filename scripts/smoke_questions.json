@@ -1,0 +1,48 @@
+{
+  "comment": "Search quality smoke for the real model and the pinned corpus. The best passage must come from one of 'paths' (int8 kernels differ a little between CPUs, so a question that two docs answer lists both). Off-topic questions must find nothing. tests/test_quality.py and scripts/smoke_check.py read this file.",
+  "answered": [
+    {
+      "question": "Which embedding model does the mascot use?",
+      "paths": [
+        "docs/infrastructure.md",
+        "docs/third-party.md"
+      ]
+    },
+    {
+      "question": "Welches Embedding-Modell nutzt das Maskottchen?",
+      "paths": [
+        "docs/infrastructure.md",
+        "docs/third-party.md"
+      ]
+    },
+    {
+      "question": "Which email provider sends the invites?",
+      "paths": [
+        "docs/infrastructure.md"
+      ]
+    },
+    {
+      "question": "Welcher Anbieter verschickt E-Mails?",
+      "paths": [
+        "docs/infrastructure.md"
+      ]
+    },
+    {
+      "question": "What colours does the design system use?",
+      "paths": [
+        "docs/design-system.md"
+      ]
+    },
+    {
+      "question": "Was ist Synthwerk?",
+      "paths": [
+        "docs/stakeholder-guide.md"
+      ]
+    }
+  ],
+  "unanswered": [
+    "Wer hat den Film 2001 gedreht?",
+    "What is the weather in Berlin today?",
+    "How do I bake a chocolate cake?"
+  ]
+}
