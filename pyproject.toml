@@ -1,0 +1,73 @@
+[project]
+name = "synthwerk-mascot"
+version = "0.1.0"
+description = "Synthwerk Mascot: the public helper. Answers Synthwerk questions from the public docs, cites the source, no egress."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic-settings>=2.6",
+    "numpy>=2.1",
+    "onnxruntime>=1.20",
+    "tokenizers>=0.23.2",
+    "structlog==26.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    # Starlette >= 1.0 TestClient imports httpx2; plain httpx is deprecated there.
+    "httpx2>=2.13",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pre-commit>=4.0",
+    "jsonschema>=4.26",
+    "types-jsonschema>=4.26",
+    # Builds a tiny ONNX graph in the tests, so the real ONNX Runtime path runs without weights.
+    "onnx>=1.19",
+    "pyyaml>=6.0.3",
+    "types-pyyaml>=6.0.12.20261030",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/synthwerk_mascot"]
+
+[tool.ruff]
+line-length = 100
+# py313 on purpose (same as synthwerk-vision): the py314 formatter drops the parentheses in
+# `except (A, B):` (PEP 758), which reads like Python 2.
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests", "scripts"]
+
+[[tool.mypy.overrides]]
+module = ["onnxruntime.*", "onnx.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["model: needs the real model files in models/ (skipped when they are missing)"]
+
+[tool.coverage.run]
+source = ["synthwerk_mascot"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80
