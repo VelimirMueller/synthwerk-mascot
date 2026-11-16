@@ -3,7 +3,7 @@
 # Only the build stage reaches the network (model from Hugging Face, docs from GitHub, both
 # pinned). The running container needs no network at all.
 
-FROM python:3.14-slim AS build
+FROM python:3.15-slim AS build
 COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
@@ -20,7 +20,7 @@ ARG CORPUS_REF=6d85efc565cae51492607b2c74b01305c7ba8f76
 RUN .venv/bin/python scripts/fetch_corpus.py "$CORPUS_REF" --out /tmp/corpus \
  && .venv/bin/python -m synthwerk_mascot.build --corpus /tmp/corpus --ref "$CORPUS_REF" --out index
 
-FROM python:3.14-slim
+FROM python:3.15-slim
 RUN useradd --system --uid 10001 --home /app app
 WORKDIR /app
 COPY --from=build /app/.venv /app/.venv
